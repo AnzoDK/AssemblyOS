@@ -50,50 +50,62 @@ kernel_main:
     ret
     
 kernel_print:
-    mov $0, %ecx
+    mov $0, %ecx #loop counter
     kernel_print_L1:
-    cmp  %ecx, %eax
-    je   kernel_print_L1
-    add  %ebx, %ecx
-    mov  (%ebx),
-    inc  %ecx
+    cmp  %ecx, %eax #Check if we should stop loop
+    je   kernel_print_end
+    mov  vga_buffer_ptr, %edx
+    add   %ecx, %edx #Add counter to pointer
+    add   %ecx, %ebx #Add counter to char[] pointer
+    pushl %edx
+    mov  (%ebx), %dh #move the char to upper 8 bits of dx
+    popl  %ebx
+    movb  vga_current_color, %dl
+    mov   %dx, %bx
+    inc   %ecx
+    jmp   kernel_print_L1
+    kernel_print_end:
     ret
     
     
     
 kernel_init:
     # Set the default color
-    movb VGA_COLOR_WHITE, %ah
-    movb VGA_COLOR_BLACK, %al
-    shl  $4, %ah
+    movb $VGA_COLOR_WHITE, %al
+    movb $VGA_COLOR_CYAN, %ah
+    shl  $4, %al
     shr  $4, %ax
-    mov  %al, vga_current_color
-    
-    movb $0, terminal_row
-    movb $0, terminal_column
+    movb  %al, vga_current_color
+    movb $0, %bl
+    movb %bl, terminal_row
+    movb %bl, terminal_column
     #reset the VGA buffer
-    mov  $0, %ecx
+    movl  $0, %ecx
+    jmp  kernel_init_L1
+    kernel_init_L0:
+    incl  %ecx
     kernel_init_L1: #counts on ecx(y)
     cmp  %ecx, vga_width
     je   kernel_init_loop_end
-    inc  %ecx
-    mov  $0, %edx
+    movl  $0, %edx
     kernel_init_L2: #counts on edx (x)
     cmp  %edx, vga_height
-    je   kernel_init_L1
-    mov  %ecx, %eax
-    mul  vga_width
-    add  %edx, %eax
+    je   kernel_init_L0
+    movl  %ecx, %eax
+    mull  (vga_width)
+    addl  %edx, %eax
     pushl %ecx
-    mov  vga_buffer_ptr, %ecx
-    add  %eax, %ecx
-    mov  $' ', %ecx
-    mov  %ecx, (%eax)
-    popl %ecx
-    inc  %edx
+    movl  vga_buffer_ptr, %ecx
+    addl  %ecx, %eax
+    movb  $'F', %cl
+    movb  vga_current_color, %ch
+    
+    movl  %ecx, (%eax)
+    popl  %ecx
+    incl  %edx
     jmp  kernel_init_L2
     kernel_init_loop_end:
     
     
-    ret
+    retl
     
