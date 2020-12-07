@@ -38,8 +38,8 @@
         vga_buffer_ptr: .int 0xB8000
 
 .text
-.global kernel_main
-kernel_main:
+.global main
+main:
     movl %esp, %ebp #for correct debugging
     mov %esp, %ebp #for correct debugging
     # write your code here
@@ -62,7 +62,7 @@ kernel_print:
     add   %ecx, %edx #Add counter to pointer
     add   %ecx, %ebx #Add counter to char[] pointer
     pushl %edx
-    mov  (%ebx), %dh #move the char to upper 8 bits of dx
+    movb  (%ebx), %dh #move the char to upper 8 bits of dx
     popl  %ebx
     movb  vga_current_color, %dl
     mov   %dx, %bx
