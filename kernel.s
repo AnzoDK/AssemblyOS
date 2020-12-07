@@ -81,15 +81,16 @@ kernel_init:
     movb %bl, terminal_column
     #reset the VGA buffer
     movl  $0, %ecx
-    jmp  kernel_init_L1
+    jmp  kernel_init_L1 #Loop doesn't work because its a 16 bit array, meaning that we have to add 2 bytes everytime to the array, therefore
+    #We have to convert the array offset to represent every other byte instead of every byte.
     kernel_init_L0:
     incl  %ecx
     kernel_init_L1: #counts on ecx(y)
-    cmp  %ecx, vga_width
+    cmp  %ecx, vga_height
     je   kernel_init_loop_end
     movl  $0, %edx
     kernel_init_L2: #counts on edx (x)
-    cmp  %edx, vga_height
+    cmp  %edx, vga_width
     je   kernel_init_L0
     movl  %ecx, %eax
     mull  (vga_width)
@@ -100,7 +101,7 @@ kernel_init:
     movb  $'F', %cl
     movb  vga_current_color, %ch
     
-    movl  %ecx, (%eax)
+    movw  %cx, (%eax)
     popl  %ecx
     incl  %edx
     jmp  kernel_init_L2
