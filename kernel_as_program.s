@@ -28,7 +28,8 @@
     .align 4
         .comm vga_current_color, 1
         .comm terminal_row, 4
-        .comm terminal_column, 4 
+        .comm terminal_column, 4
+        .comm debug, 2
         
 .section .data
     .align 4
@@ -50,52 +51,110 @@ main:
     call  kernel_init
     mov   $30, %eax
     mov   $hello_str, %ebx
-    #call  kernel_print
+    call  kernel_print
     ret
     
 kernel_print:
     mov $0, %ecx #loop counter
+    call  get_vga_ptr
     kernel_print_L1:
     cmp  %ecx, %eax #Check if we should stop loop
     je   kernel_print_end
-    mov  vga_buffer_ptr, %edx
-    add   %ecx, %edx #Add counter to pointer
-    add   %ecx, %ebx #Add counter to char[] pointer
-    pushl %edx
-    movb  (%ebx), %dh #move the char to upper 8 bits of dx
-    popl  %ebx
-    movb  vga_current_color, %dl
-    mov   %dx, %bx
+    pushl %ecx
+    movb  (%ebx), %ch #move the char to upper 8 bits of cx
+    movb  vga_current_color, %cl
+    movw  %cx, debug
+    #movw  %cx, (%edx)
+    popl  %ecx
     inc   %ecx
+    inc   %ebx #increment counter to char[] pointer
+    call  advance_terminal
+    call  get_vga_ptr #Returns VGA pointer with offset on %edx
     jmp   kernel_print_L1
     kernel_print_end:
     ret
     
+
+advance_terminal:
+    pushl %eax
+    mov  terminal_column, %eax
+    inc  %eax
+    cmp  vga_width, %eax #eax >= vga_width
+    jge  advance_terminal_update
+    mov  %eax, terminal_column
+    jmp  advance_terminal_end
     
+    advance_terminal_update:
+    sub  $80, %eax
+    pushl %edx
+    mov  terminal_row, %edx
+    inc  %edx
+    cmp  vga_height, %edx #edx >= vga_height
+    jge  advance_terminal_reset
+    mov  %edx, terminal_row
+    popl %edx
+    mov  %eax, terminal_column
+    jmp  advance_terminal_end
     
-kernel_init:
-    # Set the default color
-    movb $VGA_COLOR_WHITE, %al
-    movb $VGA_COLOR_CYAN, %ah
-    shl  $4, %al
-    shr  $4, %ax
-    movb  %al, vga_current_color
-    movb $0, %bl
-    movb %bl, terminal_row
-    movb %bl, terminal_column
+    advance_terminal_reset:
+    popl %edx
+    call clear_terminal
+    
+    advance_terminal_end:
+    popl  %eax
+    ret
+
+get_vga_ptr:
+    pushl %eax
+    pushl %ebx
+    pushl %ecx
+    mov terminal_column, %eax
+    mov $2, %ebx
+    mull %ebx
+    
+    pushl %eax
+    mov terminal_row, %eax
+    mov vga_width, %ecx
+    
+    mull %ecx
+    mov  %eax, %edx
+    popl %eax
+    add  %eax, %edx
+    mov  vga_buffer_ptr, %eax
+    add  %eax, %edx
+    popl %ecx
+    popl %ebx
+    popl %eax
+    
+    ret
+
+
+clear_terminal:
+    pushl %eax
+    mov   $0, %eax
+    mov   %eax, terminal_column
+    mov   %eax, terminal_row
+    popl  %eax
+    
+    pushl %ecx
+    pushl %edx
+    pushl %eax
+    pushl %ebx
+    
     #reset the VGA buffer
     movl  $0, %ecx
-    jmp  kernel_init_L1 #Loop doesn't work because its a 16 bit array, meaning that we have to add 2 bytes everytime to the array, therefore
-    #We have to convert the array offset to represent every other byte instead of every byte.
-    kernel_init_L0:
+    jmp  clear_terminal_L1 #Loop doesn't work because its a 16 bit array, meaning that we have to add 2 bytes everytime to the array, therefore
+    #We have to convert the array offset to represent every other byte instead of every byte. #Yea I fixed that, but fuck you me, that was only the fucking SURFACE
+    #OF THE FUCKING ISSUE???? - WHAT DID I EVEN CODE ? - I'm not sure I want to know....
+    clear_terminal_L0:
     incl  %ecx
-    kernel_init_L1: #counts on ecx(y)
-    cmp  %ecx, vga_height
-    je   kernel_init_loop_end
+    clear_terminal_L1: #counts on ecx(y)
+    cmp  %ecx, vga_height 
+    je   clear_terminal_loop_end
     movl  $0, %edx
-    kernel_init_L2: #counts on edx (x)
+    clear_terminal_L2: #counts on edx (x)
     cmp  %edx, vga_width
-    je   kernel_init_L0
+    je   clear_terminal_L0
     movl  %ecx, %eax
     pushl %ecx
     pushl %edx
@@ -120,15 +179,30 @@ kernel_init:
     
     movl  vga_buffer_ptr, %ecx
     addl  %ecx, %eax
-    movb  $'F', %cl
+    movb  $' ', %cl
     movb  vga_current_color, %ch
     
     #movw  %cx, (%eax)
     popl  %ecx
     incl  %edx
-    jmp  kernel_init_L2
-    kernel_init_loop_end:
+    jmp  clear_terminal_L2
+    clear_terminal_loop_end:
+    
+    popl %ebx
+    popl %eax
+    popl %edx
+    popl %ecx
+    
+    ret
     
     
+kernel_init:
+    # Set the default color
+    movb $VGA_COLOR_WHITE, %al
+    movb $VGA_COLOR_CYAN, %ah
+    shl  $4, %al
+    shr  $4, %ax
+    movb  %al, vga_current_color
+    call clear_terminal
     retl
     
