@@ -32,13 +32,16 @@
         
 .section .data
     .align 4
-        hello_str: .ascii "Hello World! - I'm a Kernel ;)"
+        hello_str: .ascii "Hello World! - I'm a Kernel ;)\x0" #ascii is not zero terminated .string is
+        init_msg: .string "Initilzing kernel in Default mode"
         vga_width: .int 80
         vga_height: .int 25
         vga_buffer_ptr: .int 0xB8000
 
 .text
 .global kernel_main
+.global strlen
+
 kernel_main:
     movl %esp, %ebp #for correct debugging
     mov %esp, %ebp #for correct debugging
@@ -51,9 +54,13 @@ kernel_main:
     mov   $30, %eax
     mov   $hello_str, %ebx
     call  kernel_print
+    mov   $init_msg, %ebx
+    call  strlen
+    call  kernel_print
+    
     ret
     
-kernel_print:
+kernel_print: #Set EBX to str pointer, and EAX to length
     mov $0, %ecx #loop counter
     call  get_vga_ptr
     kernel_print_L1:
@@ -71,7 +78,25 @@ kernel_print:
     jmp   kernel_print_L1
     kernel_print_end:
     ret
-    
+
+kernel_printline: #Set EBX to str pointer, and EAX to length
+    mov $0, %ecx #loop counter
+    call  get_vga_ptr
+    kernel_printline_L1:
+    cmp  %ecx, %eax #Check if we should stop loop
+    je   kernel_printline_end
+    pushl %ecx
+    movb  (%ebx), %cl #move the char to upper 8 bits of dx
+    movb  vga_current_color, %ch
+    movw  %cx, (%edx)
+    popl  %ecx
+    inc   %ecx
+    inc  %ebx #increment char[] pointer
+    call  advance_terminal
+    call  get_vga_ptr #Returns VGA pointer with offset on %edx
+    jmp   kernel_printline_L1
+    kernel_printline_end:
+    ret 
 
 advance_terminal:
     pushl %eax
@@ -204,3 +229,17 @@ kernel_init:
     call clear_terminal
     retl
     
+    
+strlen: #Gets length of zero terminated string - Sets EAX to the length of the string - Expects a string ptr on EBX
+    pushl %ebx
+    strlen_loop:
+    cmpb $0x0, (%ebx)
+    je strlen_loop_end
+    inc %ebx
+    jmp strlen_loop
+    
+    strlen_loop_end:
+    mov %ebx, %eax
+    popl %ebx
+    sub  %ebx, %eax
+    ret

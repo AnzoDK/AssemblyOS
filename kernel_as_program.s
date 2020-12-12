@@ -28,18 +28,20 @@
     .align 4
         .comm vga_current_color, 1
         .comm terminal_row, 4
-        .comm terminal_column, 4
-        .comm debug, 2
+        .comm terminal_column, 4 
         
 .section .data
     .align 4
-        hello_str: .ascii "Hello World! - I'm a Kernel ;)"
+        hello_str: .ascii "Hello World! - I'm a Kernel ;)\x0" #ascii is not zero terminated .string is
+        init_msg: .string "Initilzing kernel in Default mode"
         vga_width: .int 80
         vga_height: .int 25
         vga_buffer_ptr: .int 0xB8000
 
 .text
 .global main
+.global strlen
+
 main:
     movl %esp, %ebp #for correct debugging
     mov %esp, %ebp #for correct debugging
@@ -51,23 +53,22 @@ main:
     call  kernel_init
     mov   $30, %eax
     mov   $hello_str, %ebx
-    call  kernel_print
+    #call  kernel_print
     ret
     
-kernel_print:
+kernel_print: #Set EBX to str pointer, and EAX to length
     mov $0, %ecx #loop counter
     call  get_vga_ptr
     kernel_print_L1:
     cmp  %ecx, %eax #Check if we should stop loop
     je   kernel_print_end
     pushl %ecx
-    movb  (%ebx), %ch #move the char to upper 8 bits of cx
-    movb  vga_current_color, %cl
-    movw  %cx, debug
+    movb  (%ebx), %cl #move the char to upper 8 bits of dx
+    movb  vga_current_color, %ch
     #movw  %cx, (%edx)
     popl  %ecx
     inc   %ecx
-    inc   %ebx #increment counter to char[] pointer
+    inc  %ebx #increment char[] pointer
     call  advance_terminal
     call  get_vga_ptr #Returns VGA pointer with offset on %edx
     jmp   kernel_print_L1
@@ -182,7 +183,7 @@ clear_terminal:
     movb  $' ', %cl
     movb  vga_current_color, %ch
     
-    #movw  %cx, (%eax)
+    movw  %cx, (%eax)
     popl  %ecx
     incl  %edx
     jmp  clear_terminal_L2
@@ -203,6 +204,27 @@ kernel_init:
     shl  $4, %al
     shr  $4, %ax
     movb  %al, vga_current_color
-    call clear_terminal
+    pushl %eax
+    pushl %ebx
+    mov  $init_msg, %ebx
+    call strlen
+    call kernel_print
+    popl %ebx
+    popl %eax
+    #call clear_terminal
     retl
     
+    
+strlen: #Gets length of zero terminated string - Sets EAX to the length of the string - Expects a string ptr on EBX
+    pushl %ebx
+    strlen_loop:
+    cmpb $0x0, (%ebx)
+    je strlen_loop_end
+    inc %ebx
+    jmp strlen_loop
+    
+    strlen_loop_end:
+    mov %ebx, %eax
+    popl %ebx
+    sub  %ebx, %eax
+    ret
