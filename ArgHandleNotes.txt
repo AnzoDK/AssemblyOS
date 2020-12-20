@@ -1,0 +1,30 @@
+Stack alligned to 4
+
+::USE OF EBP INSTEAD OF ESP::
+push arg1#12
+push arg2#8
+
+##Call happens here## #4
+
+push EBP # Store old EBP #0
+
+mov ESP, EBP
+sub 8, ESP # ESP-(sizeof(localVariable a)+sizeof(localVariable b)) - only needed for local variables
+arg1 = 12(EBP)
+arg2 = 8(EBP)
+
+::ALLOCATION OF NEW LOCAL VARIABLES:: THIS DOES NOT WORK WITH PUSH OR POP - MEANING FUNCTION CALLS ARE A PROBLEM UNLESS EXTRA SPACE IS RESERVED FOR IT
+
+mov 4, EAX #local variable 4
+mov EAX, -4(EBP) #store it
+
+
+::END THE FUNCTION::
+mov EBP, ESP
+pop EBP
+ret
+
+
+
+
+
