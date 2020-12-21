@@ -49,6 +49,7 @@ main:
     mov   $0, %edx
     mov   $0, %ecx
     mov   $0, %ebx
+    movl  %eax, 0x0
     call  kernel_init
     pushl %ebp
     movl  %esp, %ebp
@@ -326,3 +327,32 @@ strlen: #Gets length of zero terminated string - Sets EAX to the length of the s
     movl %ebp, %esp
     popl %ebp
     ret
+    
+exc_0d_handler: #Error handle
+    #push %gs
+    #mov $ZEROBASED_DATA_SELECTOR, %gs
+    #mov $'D', vga_buffer_ptr
+    # D in the top-left corner means we're handling
+    #  a GPF exception right ATM.
+ 
+    # your 'normal' handler comes here
+    pushal
+    #push %ds
+    #push %es
+    #mov $KERNEL_DATA_SELECTOR,%ax
+    #mov %ax, %dx
+    #mov %ax, %es
+ 
+    #call gpfExcHandler
+ 
+    #pop %es
+    #pop %ds
+    popal
+ 
+    #movb $'D', ($0x8002)
+    # the 'D' moved one character to the right, letting
+    # us know that the exception has been handled properly
+    # and that normal operations continues.
+    #pop %gs
+    iret
+    

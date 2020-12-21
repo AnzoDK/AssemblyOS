@@ -1,5 +1,5 @@
 #Note to self - There is no Malloc, therefore no God - To be fucked is to code without having a malloc
-#most functions use registers as parameters instead of the stack - That is probably a bad idea in the long run
+#most functions use registers as parameters instead of the stack - That is probably a bad idea in the long run #this has been adressed!
 
 #enum VGA_COLOR
 .equ VGA_COLOR_BLACK,         0
@@ -34,12 +34,14 @@
     .align 4
         hello_str: .ascii "Hello World! - I'm a Kernel ;)\x0" #ascii is not zero terminated .string is
         init_msg: .string "Initilzing kernel in Default mode"
+        d_err_msg: .string "Error"
         vga_width: .int 80
         vga_height: .int 25
         vga_buffer_ptr: .int 0xB8000
 
 .text
 .global kernel_main
+.global kernel_init
 .global strlen
 
 kernel_main:
@@ -49,23 +51,22 @@ kernel_main:
     mov   $0, %edx
     mov   $0, %ecx
     mov   $0, %ebx
-    call  kernel_init
+    movl  %eax, 0x0
     pushl %ebp
     movl  %esp, %ebp
-    #pushl $30
     pushl $hello_str
     call  strlen
     pushl %eax
     pushl $hello_str
     call  kernel_printline
-    #pushl $hello_str
-    #call  strlen
-    #pushl %eax
-    #pushl $hello_str
-    #call  kernel_printline
+    pushl $init_msg
+    call  strlen
+    pushl %eax
+    pushl $init_msg
+    call  kernel_printline
     pushl $'F'
     pushl $0
-    pushl $1
+    pushl $2
     call  kernel_put_char_at
     mov %ebp, %esp
     popl %ebp
@@ -328,3 +329,38 @@ strlen: #Gets length of zero terminated string - Sets EAX to the length of the s
     movl %ebp, %esp
     popl %ebp
     ret
+
+
+exc_0d_handler: #Error handle
+    push $d_err_msg
+    call strlen
+    push $d_err_msg
+    push %eax
+    call kernel_printline
+    #push %gs
+    #mov $ZEROBASED_DATA_SELECTOR, %gs
+    #mov $'D', vga_buffer_ptr
+    # D in the top-left corner means we're handling
+    #  a GPF exception right ATM.
+ 
+    # your 'normal' handler comes here
+    pushal
+    #push %ds
+    #push %es
+    #mov $KERNEL_DATA_SELECTOR,%ax
+    #mov %ax, %dx
+    #mov %ax, %es
+ 
+    #call gpfExcHandler
+ 
+    #pop %es
+    #pop %ds
+    popal
+ 
+    #movb $'D', ($0x8002)
+    # the 'D' moved one character to the right, letting
+    # us know that the exception has been handled properly
+    # and that normal operations continues.
+    #pop %gs
+    iret
+    
