@@ -64,7 +64,7 @@ main:
     #pushl $hello_str
     #call  kernel_printline
     pushl $'F'
-    pushl $0
+    pushl $80
     pushl $0
     call  kernel_put_char_at
     mov %ebp, %esp
@@ -230,11 +230,13 @@ kernel_put_char_at: #push the char and the address # void kernel_put_char_at(cha
     movl  12(%ebp), %ebx #int indexX
     movl  8(%ebp), %ecx #int indexY
     movb  16(%ebp), %al #char c
+    movl  %ecx, terminal_row
+    movl  %ebx, terminal_column
     
     mov  vga_current_color, %ah
     pushl %edx
     call get_vga_ptr #returns VGA address on %edx
-    movw %ax, (%edx)
+    #movw %ax, (%edx)
     popl %edx
     popl %ebx
     movl -4(%ebp), %eax
@@ -260,7 +262,7 @@ clear_terminal: #void clear_terminal(void)
     movl  vga_width, %edx
     movl  vga_height, %eax
     mull  %edx
-    subl  $1, %eax #Indexing being indexing
+    decl  terminal_column #Indexing being fucked
     popl  %edx
     clear_terminal_loop_L0:
     cmp  %eax, -4(%ebp) #Eax hold the total byte count

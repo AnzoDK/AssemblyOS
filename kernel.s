@@ -64,8 +64,8 @@ kernel_main:
     #pushl $hello_str
     #call  kernel_printline
     pushl $'F'
-    pushl $80
-    pushl $2
+    pushl $0
+    pushl $1
     call  kernel_put_char_at
     mov %ebp, %esp
     popl %ebp
@@ -200,12 +200,14 @@ get_vga_ptr: #uint16* get_vga_ptr(void)
     
     pushl %eax # stores x*2
     mov terminal_row, %eax
+    mov $2, %ecx
+    mull %ecx # y*2
     mov vga_width, %ecx
     
-    mull %ecx # vga_width * terminal_row
+    mull %ecx # vga_width * (terminal_row*2)
     mov  %eax, %edx
     popl %eax
-    add  %eax, %edx # (x*2) + (vga_width * terminal_row)
+    add  %eax, %edx # (x*2) + (vga_width * (terminal_row*2))
     mov  vga_buffer_ptr, %eax
     add  %eax, %edx # 0xB8000 + ((x*2) + (vga_width * terminal_row))
     popl %ecx
@@ -293,8 +295,8 @@ clear_terminal: #void clear_terminal(void)
     
 kernel_init:
     # Set the default color
-    movb $VGA_COLOR_GREEN, %al
-    movb $VGA_COLOR_RED, %ah
+    movb $VGA_COLOR_LIGHT_GREEN, %al
+    movb $VGA_COLOR_DARK_GREY, %ah
     shl  $4, %al
     shr  $4, %ax
     movb  %al, vga_current_color

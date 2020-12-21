@@ -1,0 +1,15 @@
+Current (wrong) formular:
+(width*y)+(x*2)
+y = 1
+x = 0
+(1*80)+(0*2) = 80 : Expected answer: 160 (as we only work on every second byte due to the VGA array being a 16bit array)
+
+Test: (width*(y*2))+(x*2)
+y = 1
+x = 0
+((1*2)*80)+(0*2) = 160 : Expected answer: 160
+y = 2
+x = 0
+((2*2)*80)+(0*2) = 320 : Expected answer: 320
+
+This formular seems to solve it :D
