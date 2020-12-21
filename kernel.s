@@ -58,6 +58,15 @@ kernel_main:
     pushl %eax
     pushl $hello_str
     call  kernel_printline
+    #pushl $hello_str
+    #call  strlen
+    #pushl %eax
+    #pushl $hello_str
+    #call  kernel_printline
+    pushl $'F'
+    pushl $80
+    pushl $2
+    call  kernel_put_char_at
     mov %ebp, %esp
     popl %ebp
     #mov   $hello_str, %ebx
@@ -98,19 +107,15 @@ kernel_print: #Use push # void kernel_print(char*, uint length)
     pushl %ebp
     movl  %esp, %ebp
     subl  $4, %esp #allocate space for the count variable
-    movl  12(%ebp), %eax
-    movl  8(%ebp), %ebx
-    movl   $0, %ecx #loop counter
+    movl  12(%ebp), %eax #length
+    movl  8(%ebp), %ebx #char*
+    movl  $0, %ecx #loop counter
     movl  %ecx, -4(%ebp) #-4(%ebp) = int* counter; *counter = 0
-    pushl %ebp
-    movl  %esp, %ebp
     call  get_vga_ptr
-    mov %ebp, %esp
-    pop %ebp
     kernel_print_L1:
     cmp   -4(%ebp), %eax #Check if we should stop loop
     je    kernel_print_end
-    movb  (%ebx), %cl #move the char to upper 8 bits of dx
+    movb  (%ebx), %cl #move the char to lower 8 bits of cx
     movb  vga_current_color, %ch
     movw  %cx, (%edx)
     incl   -4(%ebp)
@@ -140,6 +145,8 @@ kernel_printline: #Use Push # void kernel_printline(char* string, uint length)
     ret 
 
 kernel_newline: # void kernel_newline(void)
+    pushl %ebp
+    movl  %esp, %ebp
     pushl %eax
     mov $0, %eax
     mov %eax, terminal_column
@@ -147,6 +154,8 @@ kernel_newline: # void kernel_newline(void)
     inc %eax 
     mov %eax, terminal_row
     popl %eax
+    mov   %ebp, %esp
+    popl  %ebp
     ret
 
 
@@ -180,6 +189,8 @@ advance_terminal: #void advance_terminal(void)
     ret
 
 get_vga_ptr: #uint16* get_vga_ptr(void)
+    pushl %ebp
+    movl  %esp, %ebp
     pushl %eax
     pushl %ebx
     pushl %ecx
@@ -200,93 +211,90 @@ get_vga_ptr: #uint16* get_vga_ptr(void)
     popl %ecx
     popl %ebx
     popl %eax
-    
+    mov   %ebp, %esp
+    popl  %ebp
     ret
 
 
-kernel_put_char_at: #push the char and the address # void kernel_put_char_at(char c, int index)
-    popw %ax
+kernel_put_char_at: #push the char and the address # void kernel_put_char_at(char c, int indexX, int indexY)
+    pushl %ebp
+    movl  %esp, %ebp
+    subl  $8, %esp #Allocating space for Old_terminal_X and old terminalY
+    pushl %eax
+    movl  terminal_column, %eax
+    movl  %eax, -4(%ebp) #OLD terminal_column
+    movl  terminal_row, %eax
+    movl  %eax, -8(%ebp) #OLD terminal_row
+    pushl %ebx
+    pushl %ecx
+    movl  12(%ebp), %ebx #int indexX
+    movl  8(%ebp), %ecx #int indexY
+    movb  16(%ebp), %al #char c
+    movl  %ecx, terminal_row
+    movl  %ebx, terminal_column
+    
     mov  vga_current_color, %ah
+    pushl %edx
+    call get_vga_ptr #returns VGA address on %edx
+    movw %ax, (%edx)
+    popl %edx
     popl %ebx
-    movw %ax, (%ebx)
+    movl -4(%ebp), %eax
+    movl %eax, terminal_column
+    movl -8(%ebp), %eax
+    movl %eax, terminal_row
+    popl %eax
+    movl %ebp, %esp
+    popl %ebp
     ret
 
 
 clear_terminal: #void clear_terminal(void)
-    pushl %eax
-    mov   $0, %eax
-    mov   %eax, terminal_column
-    mov   %eax, terminal_row
-    popl  %eax
+    pushl %ebp
+    movl  %esp, %ebp
+    subl  $4, %esp #aligned to 4, allocate space for counter
     
-    pushl %ecx
+    #Get the total amount of characters to place
+    pushl %eax
+    movl $0, %eax
+    movl %eax, -4(%ebp) #set counter to 0
     pushl %edx
+    movl  vga_width, %edx
+    movl  vga_height, %eax
+    mull  %edx
+    decl  terminal_column #Indexing being fucked
+    popl  %edx
+    clear_terminal_loop_L0:
+    cmp  %eax, -4(%ebp) #Eax hold the total byte count
+    jl   clear_terminal_loop_L1
+    jmp  clear_terminal_end
+    
+    clear_terminal_loop_L1:
     pushl %eax
-    pushl %ebx
-    
-    #reset the VGA buffer
-    movl  $0, %ecx
-    jmp  clear_terminal_L1 #Loop doesn't work because its a 16 bit array, meaning that we have to add 2 bytes everytime to the array, therefore
-    #We have to convert the array offset to represent every other byte instead of every byte. #Yea I fixed that, but fuck you me, that was only the fucking SURFACE
-    #OF THE FUCKING ISSUE???? - WHAT DID I EVEN CODE ? - I'm not sure I want to know.... ITS WORKING (KINDA) AND STILL SUCKS....
-    clear_terminal_L0:
-    incl  %ecx
-    clear_terminal_L1: #counts on ecx(y)
-    cmp  vga_height, %ecx #ecx < vga_height
-    jl  clear_terminal_L2
-    jmp clear_terminal_loop_end
-    clear_terminal_L2:
-    movl  $0, %edx
-    clear_terminal_L3: #counts on edx (x)
-    cmp   vga_width, %edx #edx < vga_width
-    jl   clear_terminal_L4
-    jmp  clear_terminal_L0
-    clear_terminal_L4:
-    movl  %ecx, %eax #%eax = counter_y
-    pushl %ecx
-    pushl %edx #save the contents of %edx from being overriden by mull
-    movl  vga_width, %ecx
-    
-    mull  %ecx #multiply uses both edx and eax - eax stores the lower part and edx stores the higher part # vga_width*counter_y
-    popl  %edx #restore %edx - counter_y is still on the stack
-    
-    pushl %eax #save result of vga_width*counter_y
-    mov   $2, %eax 
-    
-    pushl  %edx# save edx from mull again
-    
-    mull  %edx# counter_x * 2
-    
-    popl  %edx #Stack contains [result of vga_width*counter_y, counter_y] after this pop
-    
-    mov   %eax, %ecx #move result of counter_x * 2 into ecx
-    popl  %eax #Get result of vga_width*counter_y from stack
-    
-    addl  %ecx, %eax #(counter_x * 2)+(vga_width*counter_y)
-    
-    movl  vga_buffer_ptr, %ecx
-    addl  %ecx, %eax # 0xB0000 + (counter_x * 2)+(vga_width*counter_y)
-    movb  $' ', %cl
-    movb  vga_current_color, %ch
-    
-    movw  %cx, (%eax)
-    popl  %ecx #pops counter_y
-    incl  %edx #counter_x++
-    jmp  clear_terminal_L3
-    clear_terminal_loop_end:
-    
-    popl %ebx
+    call advance_terminal
+    call get_vga_ptr
+    incl -4(%ebp)
+    movb  $' ', %al
+    movb  vga_current_color, %ah
+    movw  %ax, (%edx)
     popl %eax
-    popl %edx
-    popl %ecx
+    jmp  clear_terminal_loop_L0
     
+    clear_terminal_end:
+    movl $0, %eax
+    movl %eax, terminal_column
+    movl %eax, terminal_row
+    popl %eax
+    
+    mov  %ebp, %esp
+    popl %ebp
     ret
     
     
 kernel_init:
     # Set the default color
-    movb $VGA_COLOR_WHITE, %al
-    movb $VGA_COLOR_CYAN, %ah
+    movb $VGA_COLOR_GREEN, %al
+    movb $VGA_COLOR_RED, %ah
     shl  $4, %al
     shr  $4, %ax
     movb  %al, vga_current_color
@@ -295,7 +303,7 @@ kernel_init:
     
     
 strlen: #Gets length of zero terminated string - Sets EAX to the length of the string - Expects a string ptr in stack 
-# Only supports strings of 4,294967296*10^9 characters
+# Only supports strings of 4,294967296*10^9-1 characters
     pushl %ebp
     movl  %esp, %ebp
     sub   $4, %esp #reserve space for orignal address
